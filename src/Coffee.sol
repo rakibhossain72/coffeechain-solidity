@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 /**
  * @title BuyMeACoffee
- * @author Your Name
+ * @author Rakib Hossain
  * @notice A decentralized platform for supporters to send tips to creators
  * @dev Allows creators to register and receive tips from supporters with messages
  */
@@ -38,6 +38,9 @@ contract BuyMeACoffee {
 
     /// @notice Mapping from creator address to their profile
     mapping(address => Creator) public creators;
+
+    /// @notice Mapping from creator name hash to their address
+    mapping(bytes32 => address) private creatorByName;
 
     /// @notice Mapping from creator address to their array of received memos
     mapping(address => Memo[]) private memosByCreator;
@@ -114,7 +117,12 @@ contract BuyMeACoffee {
             revert AlreadyRegistered();
         }
 
+        bytes32 nameHash = keccak256(bytes(_name));
+        if (creatorByName[nameHash] != address(0)) revert AlreadyRegistered();
+
         creators[msg.sender] = Creator({name: _name, about: _about, owner: payable(msg.sender), totalReceived: 0});
+
+        creatorByName[nameHash] = msg.sender;
 
         emit CreatorRegistered(msg.sender, _name, _about);
     }
@@ -128,6 +136,17 @@ contract BuyMeACoffee {
     function updateCreator(string calldata _name, string calldata _about) external {
         if (creators[msg.sender].owner == address(0)) revert NotACreator();
         if (bytes(_name).length == 0) revert EmptyName();
+
+        bytes32 oldHash = keccak256(bytes(creators[msg.sender].name));
+        bytes32 newHash = keccak256(bytes(_name));
+
+        if (oldHash != newHash) {
+            if (creatorByName[newHash] != address(0)) {
+                revert AlreadyRegistered();
+            }
+            delete creatorByName[oldHash];
+            creatorByName[newHash] = msg.sender;
+        }
 
         creators[msg.sender].name = _name;
         creators[msg.sender].about = _about;
@@ -199,6 +218,18 @@ contract BuyMeACoffee {
      */
     function getCreator(address _creator) external view returns (Creator memory) {
         return creators[_creator];
+    }
+
+    /**
+     * @notice Retrieves the profile information for a specific creator
+     * @param _name Name of the creator
+     * @return Creator struct containing profile information
+     */
+
+    function getCreatorByName(string calldata _name) external view returns (Creator memory) {
+        address creator = creatorByName[keccak256(bytes(_name))];
+        if (creator == address(0)) revert CreatorNotRegistered();
+        return creators[creator];
     }
 
     /**

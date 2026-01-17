@@ -680,6 +680,85 @@ contract BuyMeACoffeeTest is Test {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // MISSING COVERAGE TESTS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Tests the getCreatorByName view function
+     */
+    function test_GetCreatorByName_Success() public {
+        vm.prank(creator1);
+        coffee.registerCreator(CREATOR1_NAME, CREATOR1_ABOUT);
+
+        BuyMeACoffee.Creator memory creator = coffee.getCreatorByName(CREATOR1_NAME);
+        assertEq(creator.name, CREATOR1_NAME);
+        assertEq(creator.owner, creator1);
+    }
+
+    /**
+     * @notice Tests that getCreatorByName reverts for unregistered names
+     */
+    function test_GetCreatorByName_NotRegistered_Reverts() public {
+        vm.expectRevert(BuyMeACoffee.CreatorNotRegistered.selector);
+        coffee.getCreatorByName("NonExistentName");
+    }
+
+    /**
+     * @notice Tests updateCreator when the name remains the same (branch coverage)
+     */
+    function test_UpdateCreator_SameName_Success() public {
+        vm.startPrank(creator1);
+        coffee.registerCreator(CREATOR1_NAME, CREATOR1_ABOUT);
+
+        // Update only the 'about' section, keeping the name identical
+        coffee.updateCreator(CREATOR1_NAME, "New About Info");
+
+        BuyMeACoffee.Creator memory creator = coffee.getCreator(creator1);
+        assertEq(creator.name, CREATOR1_NAME);
+        assertEq(creator.about, "New About Info");
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Tests that updateCreator reverts if the new name is already taken by another creator
+     */
+    function test_UpdateCreator_NewNameAlreadyTaken_Reverts() public {
+        // Register Creator 1
+        vm.prank(creator1);
+        coffee.registerCreator(CREATOR1_NAME, CREATOR1_ABOUT);
+
+        // Register Creator 2
+        vm.prank(creator2);
+        coffee.registerCreator(CREATOR2_NAME, CREATOR2_ABOUT);
+
+        // Creator 1 tries to change their name to Creator 2's name
+        vm.startPrank(creator1);
+        vm.expectRevert(BuyMeACoffee.AlreadyRegistered.selector);
+        coffee.updateCreator(CREATOR2_NAME, "Trying to steal name");
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Tests updating to a completely new, available name
+     */
+    function test_UpdateCreator_NewName_Success() public {
+        vm.startPrank(creator1);
+        coffee.registerCreator(CREATOR1_NAME, CREATOR1_ABOUT);
+
+        string memory brandNewName = "Brand New Name";
+        coffee.updateCreator(brandNewName, CREATOR1_ABOUT);
+
+        // Verify mapping was updated and old name was deleted
+        BuyMeACoffee.Creator memory creator = coffee.getCreatorByName(brandNewName);
+        assertEq(creator.owner, creator1);
+
+        // This should now revert because the old name was deleted
+        vm.expectRevert(BuyMeACoffee.CreatorNotRegistered.selector);
+        coffee.getCreatorByName(CREATOR1_NAME);
+        vm.stopPrank();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // FUZZ TESTS
     // ══════════════════════════════════════════════════════════════════════════
 
